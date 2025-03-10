@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func sendQuery(server string, query dnsmessage.Message) (dnsmessage.Message, error) {
+func SendQuery(server string, query dnsmessage.Message) (dnsmessage.Message, error) {
 	conn, err := net.DialTimeout("udp", server+":53", 5*time.Second)
 	if err != nil {
 		return dnsmessage.Message{}, err

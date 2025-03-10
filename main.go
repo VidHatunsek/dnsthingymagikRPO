@@ -1,7 +1,7 @@
 package main
 
 import (
-	"dnsthingymagik/cache"
+	"dnsthingymagik/resolver"
 	"fmt"
 	"golang.org/x/net/dns/dnsmessage"
 	"log"
@@ -15,95 +15,71 @@ func main() {
 	}
 	defer udpServer.Close()
 
-	rc := cache.NewRecordsCache()
-
 	for {
 		buf := make([]byte, 514)
 		n, addr, err := udpServer.ReadFrom(buf)
 		if err != nil {
 			log.Println(err)
 		}
-		go process(addr, buf[:n], rc)
-
-		//go response(udpServer, addr, buf)
+		go process(udpServer, addr, buf[:n])
 	}
 }
 
-func process(addr net.Addr, buf []byte, rc *cache.RecordsCache) {
-	var parser dnsmessage.Parser
-	header, err := parser.Start(buf)
+func process(udp net.PacketConn, addr net.Addr, buf []byte) {
+	msg, err := resolver.PacketParser(buf)
 	if err != nil {
-		fmt.Println("Error:", err)
+		log.Println(err)
 	}
 
-	fmt.Println(header)
-
-	msg := dnsmessage.Message{
-		Header: header,
+	faq := map[dnsmessage.Question]net.IP{}
+	for _, q := range msg.Questions {
+		if q.Type == dnsmessage.TypeA {
+			nips, err := resolver.ResolveDN(q.Name.String(), msg.Header.ID)
+			if err != nil {
+				log.Println(err)
+			}
+			faq[q] = nips[0]
+		}
 	}
 
-	for {
-		question, err := parser.Question()
-		if err == dnsmessage.ErrSectionDone {
-			break
-		}
-
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-
-		fmt.Println(question)
-		msg.Questions = append(msg.Questions, question)
+	answers := []dnsmessage.Resource{}
+	for _, q := range msg.Questions {
+		answers = append(answers, dnsmessage.Resource{
+			Header: dnsmessage.ResourceHeader{
+				Name:  q.Name,
+				Type:  dnsmessage.TypeA,
+				Class: dnsmessage.ClassINET,
+				TTL:   300, //TODO
+			},
+			Body: &dnsmessage.AResource{
+				A: [4]byte{faq[q][0], faq[q][1], faq[q][2], faq[q][3]},
+			},
+		})
 	}
 
-	for {
-		answer, err := parser.Answer()
-		if err == dnsmessage.ErrSectionDone {
-			break
-		}
-
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-
-		fmt.Println(answer)
-		msg.Answers = append(msg.Answers, answer)
+	response := dnsmessage.Message{
+		Header: dnsmessage.Header{
+			ID:                 msg.Header.ID,
+			Response:           true,
+			OpCode:             msg.Header.OpCode,
+			Authoritative:      false,
+			RecursionDesired:   msg.Header.RecursionDesired,
+			RecursionAvailable: true,
+			RCode:              dnsmessage.RCodeSuccess,
+		},
+		Questions: msg.Questions,
+		Answers:   answers,
 	}
 
-	for {
-		authority, err := parser.Authority()
-		if err == dnsmessage.ErrSectionDone {
-			break
-		}
+	fmt.Println(response)
 
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-
-		fmt.Println(authority)
-		msg.Authorities = append(msg.Authorities, authority)
+	packed, err := response.Pack()
+	if err != nil {
+		log.Println(err)
 	}
 
-	for {
-		additional, err := parser.Additional()
-		if err == dnsmessage.ErrSectionDone {
-			break
-		}
-
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-
-		fmt.Println(additional)
-		msg.Additionals = append(msg.Additionals, additional)
+	_, err = udp.WriteTo(packed, addr)
+	if err != nil {
+		return
 	}
-
-	// MESSAGE IS FULL
-
-	fmt.Println(msg)
-
 }
