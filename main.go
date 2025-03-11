@@ -31,7 +31,7 @@ func process(udp net.PacketConn, addr net.Addr, buf []byte) {
 		log.Println(err)
 	}
 
-	faq := map[dnsmessage.Question]net.IP{}
+	faq := map[dnsmessage.Question][]net.IP{}
 	for _, q := range msg.Questions {
 		if q.Type == dnsmessage.TypeA {
 			nips, err := resolver.ResolveDN(q.Name.String(), msg.Header.ID, dnsmessage.TypeA)
@@ -44,31 +44,33 @@ func process(udp net.PacketConn, addr net.Addr, buf []byte) {
 				continue
 			}
 
-			faq[q] = nips[0]
+			faq[q] = nips
 		}
 	}
 
 	answers := []dnsmessage.Resource{}
 	for _, q := range msg.Questions {
-		ip, found := faq[q]
+		ips, found := faq[q]
 		if !found {
 			log.Printf("No answer for %s, skipping...", q.Name.String())
 			continue
 		}
 
-		fmt.Println(ip)
+		for _, ip := range ips {
+			fmt.Println(ip)
 
-		answers = append(answers, dnsmessage.Resource{
-			Header: dnsmessage.ResourceHeader{
-				Name:  q.Name,
-				Type:  dnsmessage.TypeA,
-				Class: dnsmessage.ClassINET,
-				TTL:   300, //TODO
-			},
-			Body: &dnsmessage.AResource{
-				A: [4]byte{ip[0], ip[1], ip[2], ip[3]},
-			},
-		})
+			answers = append(answers, dnsmessage.Resource{
+				Header: dnsmessage.ResourceHeader{
+					Name:  q.Name,
+					Type:  dnsmessage.TypeA,
+					Class: dnsmessage.ClassINET,
+					TTL:   300, //TODO
+				},
+				Body: &dnsmessage.AResource{
+					A: [4]byte{ip[0], ip[1], ip[2], ip[3]},
+				},
+			})
+		}
 	}
 
 	response := dnsmessage.Message{

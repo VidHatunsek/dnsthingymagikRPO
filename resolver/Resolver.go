@@ -98,7 +98,7 @@ func resolveFromRoot(domainName string, id uint16, rtype dnsmessage.Type, ROOT_S
 				continue
 			}
 
-			IPs = append(IPs, ip[0])
+			IPs = append(IPs, ip...)
 			break
 		}
 	}
@@ -174,7 +174,7 @@ func resolveFromRefferal(domainName string, id uint16, rtype dnsmessage.Type, se
 			continue
 		}
 
-		IPs = append(IPs, ip[0])
+		IPs = append(IPs, ip...)
 		break
 	}
 
