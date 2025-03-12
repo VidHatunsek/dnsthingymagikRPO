@@ -7,6 +7,7 @@ import (
 	"golang.org/x/net/dns/dnsmessage"
 	"log"
 	"net"
+	"sync"
 )
 
 func main() {
@@ -21,17 +22,22 @@ func main() {
 		}
 	}(udpServer)
 
+	var wg sync.WaitGroup
 	for {
 		buf := make([]byte, 514)
 		n, addr, err := udpServer.ReadFrom(buf)
 		if err != nil {
 			log.Println(err)
 		}
-		go process(udpServer, addr, buf[:n])
+		wg.Add(1)
+		go process(udpServer, addr, buf[:n], &wg)
 	}
+
+	//recordCache.cache.PurgeExpiredEntries()
 }
 
-func process(udp net.PacketConn, addr net.Addr, buf []byte) {
+func process(udp net.PacketConn, addr net.Addr, buf []byte, wg *sync.WaitGroup) {
+	defer wg.Done()
 	msg, err := resolver.PacketParser(buf)
 	if err != nil {
 		log.Println(err)
