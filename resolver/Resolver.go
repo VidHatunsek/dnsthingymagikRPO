@@ -1,6 +1,7 @@
 package resolver
 
 import (
+	"dnsthingymagik/resolver/entities"
 	"dnsthingymagik/resolver/query"
 	"golang.org/x/net/dns/dnsmessage"
 	"log"
@@ -8,7 +9,7 @@ import (
 	"strings"
 )
 
-func ResolveDN(domainName string, id uint16, rtype dnsmessage.Type) ([]net.IP, error) {
+func ResolveDN(domainName string, id uint16, rtype dnsmessage.Type) ([]entities.Record, error) {
 	ROOT_SERVERS := []string{
 		"198.41.0.4",
 	}
@@ -21,8 +22,8 @@ func ResolveDN(domainName string, id uint16, rtype dnsmessage.Type) ([]net.IP, e
 	return result, nil
 }
 
-func resolveFromRoot(domainName string, id uint16, rtype dnsmessage.Type, ROOT_SERVERS []string) ([]net.IP, error) {
-	var IPs []net.IP
+func resolveFromRoot(domainName string, id uint16, rtype dnsmessage.Type, ROOT_SERVERS []string) ([]entities.Record, error) {
+	var records []entities.Record
 
 	if !strings.HasSuffix(domainName, ".") {
 		domainName += "."
@@ -54,7 +55,14 @@ func resolveFromRoot(domainName string, id uint16, rtype dnsmessage.Type, ROOT_S
 		for _, answer := range response.Answers {
 			if answer.Header.Type == dnsmessage.TypeA && response.Header.Authoritative {
 				NSs = append(NSs, answer.Header.Name.String())
-				IPs = append(IPs, answer.Body.(*dnsmessage.AResource).A[:])
+				r := entities.Record{
+					IP:    answer.Body.(*dnsmessage.AResource).A[:],
+					RType: answer.Header.Type,
+					TTL:   answer.Header.TTL,
+					Class: answer.Header.Class,
+					Name:  answer.Header.Name,
+				}
+				records = append(records, r)
 			} else if answer.Header.Type == dnsmessage.TypeNS {
 				NSs = append(NSs, answer.Header.Name.String())
 			}
@@ -75,15 +83,15 @@ func resolveFromRoot(domainName string, id uint16, rtype dnsmessage.Type, ROOT_S
 			}
 		}
 
-		if len(IPs) > 0 && response.Header.Authoritative {
-			return IPs, nil
+		if len(records) > 0 && response.Header.Authoritative {
+			return records, nil
 		}
 
 		//resolve from refferal
 		for nameserver, nsip := range NSIPmap {
 			if nsip == nil {
 				nsips, err := ResolveDN(nameserver, id, dnsmessage.TypeA) // resolve nameserver if no ip
-				nsip = nsips[0]
+				nsip = nsips[0].IP
 				if err != nil || len(nsip) == 0 {
 					log.Printf("DNS server %s not resolved: %s", nameserver, err)
 					continue
@@ -98,15 +106,15 @@ func resolveFromRoot(domainName string, id uint16, rtype dnsmessage.Type, ROOT_S
 				continue
 			}
 
-			IPs = append(IPs, ip...)
+			records = append(records, ip...)
 			break
 		}
 	}
 
-	return IPs, nil
+	return records, nil
 }
 
-func resolveFromRefferal(domainName string, id uint16, rtype dnsmessage.Type, server string) ([]net.IP, error) {
+func resolveFromRefferal(domainName string, id uint16, rtype dnsmessage.Type, server string) ([]entities.Record, error) {
 	if !strings.HasSuffix(domainName, ".") {
 		domainName += "."
 	}
@@ -129,12 +137,19 @@ func resolveFromRefferal(domainName string, id uint16, rtype dnsmessage.Type, se
 		return nil, err
 	}
 
-	var IPs []net.IP
+	var records []entities.Record
 	NSIPmap := make(map[string]net.IP)
 
 	for _, answer := range response.Answers {
 		if answer.Header.Type == dnsmessage.TypeA && response.Header.Authoritative {
-			IPs = append(IPs, answer.Body.(*dnsmessage.AResource).A[:])
+			r := entities.Record{
+				IP:    answer.Body.(*dnsmessage.AResource).A[:],
+				RType: answer.Header.Type,
+				TTL:   answer.Header.TTL,
+				Class: answer.Header.Class,
+				Name:  answer.Header.Name,
+			}
+			records = append(records, r)
 		} else if answer.Header.Type == dnsmessage.TypeNS {
 			NSIPmap[answer.Body.(*dnsmessage.NSResource).NS.String()] = nil
 		}
@@ -152,14 +167,14 @@ func resolveFromRefferal(domainName string, id uint16, rtype dnsmessage.Type, se
 		}
 	}
 
-	if len(IPs) > 0 && response.Header.Authoritative {
-		return IPs, nil
+	if len(records) > 0 && response.Header.Authoritative {
+		return records, nil
 	}
 
 	for nameserver, nsip := range NSIPmap {
 		if nsip == nil {
 			nsips, err := ResolveDN(nameserver, id, dnsmessage.TypeA) // resolve nameserver if no ip
-			nsip = nsips[0]
+			nsip = nsips[0].IP
 			if err != nil || len(nsip) == 0 {
 				log.Printf("DNS server %s not resolved: %s", nameserver, err)
 				continue
@@ -174,11 +189,11 @@ func resolveFromRefferal(domainName string, id uint16, rtype dnsmessage.Type, se
 			continue
 		}
 
-		IPs = append(IPs, ip...)
+		records = append(records, ip...)
 		break
 	}
 
-	return IPs, nil
+	return records, nil
 }
 
 //func ProcessDNSResponse(res dnsmessage.Message) ([]net.IP, []dnsmessage.Resource, map[string]net.IP, string, error) {

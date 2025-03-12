@@ -2,6 +2,7 @@ package main
 
 import (
 	"dnsthingymagik/resolver"
+	"dnsthingymagik/resolver/entities"
 	"fmt"
 	"golang.org/x/net/dns/dnsmessage"
 	"log"
@@ -13,7 +14,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer udpServer.Close()
+	defer func(udpServer net.PacketConn) {
+		err := udpServer.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(udpServer)
 
 	for {
 		buf := make([]byte, 514)
@@ -31,7 +37,7 @@ func process(udp net.PacketConn, addr net.Addr, buf []byte) {
 		log.Println(err)
 	}
 
-	faq := map[dnsmessage.Question][]net.IP{}
+	var faq []entities.Record
 	for _, q := range msg.Questions {
 		if q.Type == dnsmessage.TypeA {
 			nips, err := resolver.ResolveDN(q.Name.String(), msg.Header.ID, dnsmessage.TypeA)
@@ -44,33 +50,23 @@ func process(udp net.PacketConn, addr net.Addr, buf []byte) {
 				continue
 			}
 
-			faq[q] = nips
+			faq = append(faq, nips...)
 		}
 	}
 
-	answers := []dnsmessage.Resource{}
-	for _, q := range msg.Questions {
-		ips, found := faq[q]
-		if !found {
-			log.Printf("No answer for %s, skipping...", q.Name.String())
-			continue
-		}
-
-		for _, ip := range ips {
-			fmt.Println(ip)
-
-			answers = append(answers, dnsmessage.Resource{
-				Header: dnsmessage.ResourceHeader{
-					Name:  q.Name,
-					Type:  dnsmessage.TypeA,
-					Class: dnsmessage.ClassINET,
-					TTL:   300, //TODO
-				},
-				Body: &dnsmessage.AResource{
-					A: [4]byte{ip[0], ip[1], ip[2], ip[3]},
-				},
-			})
-		}
+	var answers []dnsmessage.Resource
+	for _, record := range faq {
+		answers = append(answers, dnsmessage.Resource{
+			Header: dnsmessage.ResourceHeader{
+				Name:  record.Name,
+				Type:  record.RType,
+				Class: record.Class,
+				TTL:   record.TTL,
+			},
+			Body: &dnsmessage.AResource{
+				A: [4]byte{record.IP[0], record.IP[1], record.IP[2], record.IP[3]},
+			},
+		})
 	}
 
 	response := dnsmessage.Message{

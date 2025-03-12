@@ -2,9 +2,9 @@
 
 This is my simple, barebones, **insecure** implementation of a simple DNS server meant for local use. The goal is to support RFC 1035, local records, ad blocking.
 
-For now it successfully recursively resolves A records.
+For now, it successfully recursively resolves A records.
 
-NOTE: TTLs are hardcoded for now
+Sends through correct TTL values.
 
 ## Testing
 
