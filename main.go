@@ -1,6 +1,7 @@
 package main
 
 import (
+	"dnsthingymagik/recordcache"
 	"dnsthingymagik/resolver"
 	"dnsthingymagik/resolver/entities"
 	"fmt"
@@ -22,6 +23,8 @@ func main() {
 		}
 	}(udpServer)
 
+	cache := recordcache.NewCache()
+
 	var wg sync.WaitGroup
 	for {
 		buf := make([]byte, 514)
@@ -30,13 +33,13 @@ func main() {
 			log.Println(err)
 		}
 		wg.Add(1)
-		go process(udpServer, addr, buf[:n], &wg)
+		go process(udpServer, addr, buf[:n], cache, &wg)
 	}
 
-	//recordCache.cache.PurgeExpiredEntries()
+	//recordCache.recordcache.PurgeExpiredEntries()
 }
 
-func process(udp net.PacketConn, addr net.Addr, buf []byte, wg *sync.WaitGroup) {
+func process(udp net.PacketConn, addr net.Addr, buf []byte, cache *recordcache.Cache, wg *sync.WaitGroup) {
 	defer wg.Done()
 	msg, err := resolver.PacketParser(buf)
 	if err != nil {
@@ -46,7 +49,7 @@ func process(udp net.PacketConn, addr net.Addr, buf []byte, wg *sync.WaitGroup) 
 	var faq []entities.Record
 	for _, q := range msg.Questions {
 		if q.Type == dnsmessage.TypeA {
-			nips, err := resolver.ResolveDN(q.Name.String(), msg.Header.ID, dnsmessage.TypeA)
+			nips, err := resolver.ResolveDN(q.Name, msg.Header.ID, dnsmessage.TypeA, cache)
 			if err != nil {
 				log.Println(err)
 			}
