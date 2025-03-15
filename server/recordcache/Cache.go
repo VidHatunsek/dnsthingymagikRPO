@@ -1,7 +1,7 @@
 package recordcache
 
 import (
-	"dnsthingymagik/resolver/entities"
+	"dnsthingymagik/server/resolver/entities"
 	"fmt"
 	"golang.org/x/net/dns/dnsmessage"
 	"sync"

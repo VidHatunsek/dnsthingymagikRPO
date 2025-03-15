@@ -1,9 +1,9 @@
 package resolver
 
 import (
-	"dnsthingymagik/recordcache"
-	"dnsthingymagik/resolver/entities"
-	"dnsthingymagik/resolver/query"
+	"dnsthingymagik/server/recordcache"
+	"dnsthingymagik/server/resolver/entities"
+	"dnsthingymagik/server/resolver/query"
 	"golang.org/x/net/dns/dnsmessage"
 	"log"
 	"net"

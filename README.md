@@ -4,9 +4,48 @@ This is my simple, barebones, **insecure** implementation of a simple DNS server
 
 For now, it successfully recursively resolves A records.
 
-Sends through correct TTL values.
+## Features
+
+### DNS Message Parsing & Handling
+
+- [x] Can parse and respond to valid DNS queries
+- [ ] Correctly handles headers (ID, flags, opcode, RCODE)
+- [ ] Supports question section processing
+- [ ] Correctly formats answers, authority, and additional sections
+
+### Supported Query Types
+
+- [x] A (IPv4 address)
+- [ ] AAAA (IPv6 address)
+- [ ] CNAME (Canonical name)
+- [ ] NS (Nameserver)
+- [ ] MX (Mail Exchange)
+- [ ] TXT (Text records)
+- [ ] PTR (Reverse lookups)
+- [ ] SOA (Start of Authority)
+
+### Query Processing
+
+- [ ] Supports recursive queries (if implemented)
+- [ ] Supports iterative queries (if acting as authoritative server)
+- [ ] Correctly handles RD (Recursion Desired) flag
+- [ ] Supports negative responses (NXDOMAIN, NODATA)
+- [x] Supports wildcards (*.example.com)
+
+### Caching & TTL
+
+- [x] Correctly applies TTL from authoritative responses
+- [x] Handles cache expiration and eviction
+
+### Error Handling
+
+- [ ] Responds correctly to malformed queries
+- [ ] Returns correct RCODE values (e.g., SERVFAIL, REFUSED, NXDOMAIN)
+- [ ] Handles timeouts and retransmissions
 
 ## Testing
+
+`go test dnsthingymagik/tests`
 
 `dig @serverip domain.tld`
 
