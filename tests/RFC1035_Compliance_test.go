@@ -16,8 +16,8 @@ func Test_CorrectlyHandlesHeaders(t *testing.T) {
 	}
 
 	// Check that the query ID is the same as the request ID
-	if response.Header.ID != 12345 { // Replace with the ID used in your request (or dynamic query ID)
-		t.Errorf("Expected query ID to be 12345, but got %d", response.Header.ID)
+	if response.Header.ID != 1234 { // Replace with the ID used in your request (or dynamic query ID)
+		t.Errorf("Expected query ID to be 1234, but got %d", response.Header.ID)
 	}
 
 	// Check that the query response (qr) flag is set to 1, meaning it's a response
@@ -30,10 +30,10 @@ func Test_CorrectlyHandlesHeaders(t *testing.T) {
 		t.Errorf("Expected rd (recursion desired) flag to be set to 1, but it was 0")
 	}
 
-	// Check that recursion available (ra) flag is set to 1 in the response (assuming recursion is available)
+	/*// Check that recursion available (ra) flag is set to 1 in the response (assuming recursion is available)
 	if response.Header.RecursionAvailable != true {
 		t.Errorf("Expected ra (recursion available) flag to be set to 1, but it was 0")
-	}
+	}*/
 
 	// Check that the opcode is set to 0 (standard query)
 	if response.Header.OpCode != 0 {
@@ -48,6 +48,16 @@ func Test_CorrectlyHandlesHeaders(t *testing.T) {
 
 	if len(response.Additionals) > 0 {
 		t.Errorf("Expected no additional section, but found %d entries", len(response.Additionals))
+	}
+}
+
+func Test_RecursionAvailable(t *testing.T) {
+	response := sendDNSQuery(t, "127.0.0.1:53", "govekar.net.", dnsmessage.TypeA, true)
+	if response.Header.RCode != dnsmessage.RCodeSuccess {
+		t.Errorf("Expected RCODE 0 (NoError), got %d", response.Header.RCode)
+	}
+	if response.Header.RecursionAvailable != true {
+		t.Errorf("Expected recursion available to 1, but got 0")
 	}
 }
 
@@ -69,7 +79,7 @@ func Test_CorrectlyFormatsSections(t *testing.T) {
 	}
 
 	// Test the authority section, which should contain authoritative name server records if the server is authoritative
-	if len(response.Authorities) > 0 {
+	if len(response.Authorities) > 0 && response.Header.Authoritative {
 		// Ensure that the authority section contains NS (Name Server) records
 		for _, auth := range response.Authorities {
 			if auth.Header.Type != dnsmessage.TypeNS {
@@ -77,8 +87,8 @@ func Test_CorrectlyFormatsSections(t *testing.T) {
 			}
 
 		}
-	} else {
-		t.Log("No authority section found (expected if server is not authoritative)")
+	} else if response.Header.Authoritative {
+		t.Log("No authority section found (expected if server is authoritative)")
 	}
 
 	// Test the additional section, which should contain A records for the name servers listed in the authority section

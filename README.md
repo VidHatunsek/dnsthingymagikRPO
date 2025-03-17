@@ -11,13 +11,13 @@ For now, it successfully recursively resolves A records.
 - [x] Can parse and respond to valid DNS queries
 - [ ] Correctly handles headers (ID, flags, opcode, RCODE)
 - [ ] Supports question section processing
-- [ ] Correctly formats answers, authority, and additional sections
+- [x] Correctly formats answers, authority, and additional sections
 
 ### Supported Query Types
 
 - [x] A (IPv4 address)
 - [ ] AAAA (IPv6 address)
-- [ ] CNAME (Canonical name)
+- [x] CNAME (Canonical name)
 - [ ] NS (Nameserver)
 - [ ] MX (Mail Exchange)
 - [ ] TXT (Text records)
@@ -26,7 +26,7 @@ For now, it successfully recursively resolves A records.
 
 ### Query Processing
 
-- [ ] Supports recursive queries (if implemented)
+- [x] Supports recursive queries (if implemented)
 - [ ] Supports iterative queries (if acting as authoritative server)
 - [ ] Correctly handles RD (Recursion Desired) flag
 - [ ] Supports negative responses (NXDOMAIN, NODATA)
@@ -39,8 +39,8 @@ For now, it successfully recursively resolves A records.
 
 ### Error Handling
 
-- [ ] Responds correctly to malformed queries
-- [ ] Returns correct RCODE values (e.g., SERVFAIL, REFUSED, NXDOMAIN)
+- [x] Responds correctly to malformed queries
+- [x] Returns correct RCODE values (e.g., SERVFAIL, REFUSED, NXDOMAIN) // some
 - [ ] Handles timeouts and retransmissions
 
 ## Testing

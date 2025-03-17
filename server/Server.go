@@ -81,63 +81,40 @@ func (s *Server) Close() {
 // Process a single DNS query request.
 func (s *Server) process(addr net.Addr, buf []byte) {
 	defer s.wg.Done()
-
+	rcode := dnsmessage.RCodeSuccess
 	// Parse incoming DNS query
 	msg, err := resolver.PacketParser(buf)
 	if err != nil {
 		log.Printf("Packet parsing error from %s: %v", addr, err)
-		return
+		rcode = dnsmessage.RCodeFormatError
 	}
 
+	opcode := msg.Header.OpCode
+	rd := msg.Header.RecursionDesired
+
 	var records []entities.Record
-	for _, q := range msg.Questions {
-		if q.Type == dnsmessage.TypeA {
-			nips, err := resolver.ResolveDN(q.Name, msg.Header.ID, dnsmessage.TypeA, s.cache)
-			if err != nil {
-				log.Printf("Resolution error from %s for %s: %v", addr, q.Name, err)
-				continue
-			}
+	if rcode == dnsmessage.RCodeSuccess {
+		for _, q := range msg.Questions {
+			if q.Type == dnsmessage.TypeA {
+				nips, err := resolver.ResolveDN(q.Name, msg.Header.ID, dnsmessage.TypeA, s.cache)
+				if err != nil {
+					log.Printf("Resolution error from %s for %s: %v", addr, q.Name, err)
 
-			if len(nips) == 0 {
-				log.Printf("No IP found for %s from %s", q.Name.String(), addr)
-				continue
-			}
+					continue
+				}
 
-			records = append(records, nips...)
+				if len(nips) == 0 {
+					log.Printf("No IP found for %s from %s", q.Name.String(), addr)
+					continue
+				}
+
+				records = append(records, nips...)
+			}
 		}
 	}
 
-	// Build DNS answer section
-	var answers []dnsmessage.Resource
-	for _, record := range records {
-		answers = append(answers, dnsmessage.Resource{
-			Header: dnsmessage.ResourceHeader{
-				Name:  record.Name,
-				Type:  record.RType,
-				Class: record.Class,
-				TTL:   record.TTL,
-			},
-			Body: &dnsmessage.AResource{
-				A: [4]byte{record.IP[0], record.IP[1], record.IP[2], record.IP[3]},
-			},
-		})
-	}
-
 	// Prepare the response message
-	response := dnsmessage.Message{
-		Header: dnsmessage.Header{
-			ID:                 msg.Header.ID,
-			Response:           true,
-			OpCode:             msg.Header.OpCode,
-			Authoritative:      false,
-			RecursionDesired:   msg.Header.RecursionDesired,
-			RecursionAvailable: true,
-			RCode:              dnsmessage.RCodeSuccess,
-		},
-		Questions: msg.Questions,
-		Answers:   answers,
-	}
-
+	response := s.buildReplyMessage(msg.Header.ID, opcode, rd, rcode, msg.Questions, records)
 	// Pack the response
 	packed, err := response.Pack()
 	if err != nil {
@@ -146,8 +123,50 @@ func (s *Server) process(addr net.Addr, buf []byte) {
 	}
 
 	// Send the response back to the client
-	_, err = s.udpServer.WriteTo(packed, addr)
+	err = s.reply(addr, packed)
 	if err != nil {
-		log.Printf("Response write error to %s: %v", addr, err)
+		log.Printf("Error replying to %s: %v", addr, err)
 	}
+}
+
+func (s *Server) reply(addr net.Addr, buf []byte) error {
+	_, err := s.udpServer.WriteTo(buf, addr)
+	return err
+}
+
+func (s *Server) buildReplyMessage(id uint16, opcode dnsmessage.OpCode, rd bool, rcode dnsmessage.RCode, questions []dnsmessage.Question, records []entities.Record) dnsmessage.Message {
+	var answers []dnsmessage.Resource
+	if records != nil {
+		// Build DNS answer section
+
+		for _, record := range records {
+			answers = append(answers, dnsmessage.Resource{
+				Header: dnsmessage.ResourceHeader{
+					Name:  record.Name,
+					Type:  record.RType,
+					Class: record.Class,
+					TTL:   record.TTL,
+				},
+				Body: &dnsmessage.AResource{
+					A: [4]byte{record.IP[0], record.IP[1], record.IP[2], record.IP[3]},
+				},
+			})
+		}
+	}
+
+	response := dnsmessage.Message{
+		Header: dnsmessage.Header{
+			ID:                 id,
+			Response:           true,
+			OpCode:             opcode,
+			Authoritative:      false, // this server is not supported as an authoritative server
+			RecursionDesired:   rd,
+			RecursionAvailable: true, // If it supports recursion (RA flag is set), it will perform the necessary queries to resolve www.example.com and return the final IP address to the client - NO OTHER MODE CURRENTLY SUPPORTED
+			RCode:              rcode,
+		},
+		Questions: questions,
+		Answers:   answers,
+	}
+
+	return response
 }
