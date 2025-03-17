@@ -69,6 +69,15 @@ func resolveFromRoot(domainName dnsmessage.Name, id uint16, rtype dnsmessage.Typ
 				records = append(records, r)
 			} else if answer.Header.Type == dnsmessage.TypeNS {
 				NSs = append(NSs, answer.Header.Name.String())
+			} else if answer.Header.Type == dnsmessage.TypeCNAME {
+				cname := answer.Body.(*dnsmessage.CNAMEResource).CNAME
+				// Recursively resolve the CNAME target
+				cnameRecords, err := ResolveDN(cname, id, rtype, cache)
+				if err != nil {
+					log.Printf("Failed to resolve CNAME target %s: %v", cname.String(), err)
+					continue
+				}
+				records = append(records, cnameRecords...)
 			}
 		}
 
@@ -152,6 +161,15 @@ func resolveFromRefferal(domainName dnsmessage.Name, id uint16, rtype dnsmessage
 			records = append(records, r)
 		} else if answer.Header.Type == dnsmessage.TypeNS {
 			NSIPmap[answer.Body.(*dnsmessage.NSResource).NS.String()] = nil
+		} else if answer.Header.Type == dnsmessage.TypeCNAME {
+			cname := answer.Body.(*dnsmessage.CNAMEResource).CNAME
+			// Recursively resolve the CNAME target
+			cnameRecords, err := ResolveDN(cname, id, rtype, cache)
+			if err != nil {
+				log.Printf("Failed to resolve CNAME target %s: %v", cname.String(), err)
+				continue
+			}
+			records = append(records, cnameRecords...)
 		}
 	}
 

@@ -152,22 +152,25 @@ func Test_AAAARecord(t *testing.T) {
 }
 
 // Test CNAME Record
-func Test_CNAMERecord(t *testing.T) {
-	response := sendDNSQuery(t, "127.0.0.1:53", "www.govekar.net.", dnsmessage.TypeCNAME, true)
+func Test_CNAMERecordResolution(t *testing.T) {
+	// Send a DNS query for the A record of the alias
+	response := sendDNSQuery(t, "127.0.0.1:53", "www.govekar.net.", dnsmessage.TypeA, true)
 
+	// Check if the response code indicates success
 	if response.Header.RCode != dnsmessage.RCodeSuccess {
 		t.Errorf("Expected RCODE 0 (NoError), got %d", response.Header.RCode)
 	}
 
+	// Verify that the response contains at least one A record
 	found := false
 	for _, ans := range response.Answers {
-		if ans.Header.Type == dnsmessage.TypeCNAME {
+		if ans.Header.Type == dnsmessage.TypeA {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("Expected CNAME record in response")
+		t.Errorf("Expected at least one A record in the response")
 	}
 }
 
