@@ -10,7 +10,7 @@ import (
 )
 
 func ResolveDN(domainName dnsmessage.Name, id uint16, rtype dnsmessage.Type, cache *recordcache.Cache) ([]entities.Record, error) {
-	if recs, found := cache.Get(domainName, dnsmessage.TypeA); found {
+	if recs, found := cache.Get(domainName, rtype); found {
 		return recs, nil
 	}
 
@@ -67,6 +67,16 @@ func resolveFromRoot(domainName dnsmessage.Name, id uint16, rtype dnsmessage.Typ
 					Name:  answer.Header.Name,
 				}
 				records = append(records, r)
+			} else if answer.Header.Type == dnsmessage.TypeAAAA && response.Header.Authoritative {
+				NSs = append(NSs, answer.Header.Name.String())
+				r := entities.Record{
+					IP:    answer.Body.(*dnsmessage.AAAAResource).AAAA[:],
+					RType: answer.Header.Type,
+					TTL:   answer.Header.TTL,
+					Class: answer.Header.Class,
+					Name:  answer.Header.Name,
+				}
+				records = append(records, r)
 			} else if answer.Header.Type == dnsmessage.TypeNS {
 				NSs = append(NSs, answer.Header.Name.String())
 			} else if answer.Header.Type == dnsmessage.TypeCNAME {
@@ -113,7 +123,7 @@ func resolveFromRoot(domainName dnsmessage.Name, id uint16, rtype dnsmessage.Typ
 				NSIPmap[nameserver] = nsip
 			}
 
-			ip, err := resolveFromRefferal(domainName, id, dnsmessage.TypeA, nsip.String(), cache) // resolve refferal using nameserver
+			ip, err := resolveFromRefferal(domainName, id, rtype, nsip.String(), cache) // resolve refferal using nameserver
 			if err != nil {
 				log.Printf("DNS server %s not resolving domain %s: %s", nameserver, domainName, err)
 				continue
@@ -153,6 +163,15 @@ func resolveFromRefferal(domainName dnsmessage.Name, id uint16, rtype dnsmessage
 		if answer.Header.Type == dnsmessage.TypeA && response.Header.Authoritative {
 			r := entities.Record{
 				IP:    answer.Body.(*dnsmessage.AResource).A[:],
+				RType: answer.Header.Type,
+				TTL:   answer.Header.TTL,
+				Class: answer.Header.Class,
+				Name:  answer.Header.Name,
+			}
+			records = append(records, r)
+		} else if answer.Header.Type == dnsmessage.TypeAAAA && response.Header.Authoritative {
+			r := entities.Record{
+				IP:    answer.Body.(*dnsmessage.AAAAResource).AAAA[:],
 				RType: answer.Header.Type,
 				TTL:   answer.Header.TTL,
 				Class: answer.Header.Class,
@@ -201,7 +220,7 @@ func resolveFromRefferal(domainName dnsmessage.Name, id uint16, rtype dnsmessage
 			NSIPmap[nameserver] = nsip
 		}
 
-		ip, err := resolveFromRefferal(domainName, id, dnsmessage.TypeA, nsip.String(), cache) // resolve refferal using nameserver
+		ip, err := resolveFromRefferal(domainName, id, rtype, nsip.String(), cache) // resolve refferal using nameserver
 		if err != nil {
 			log.Printf("DNS server %s not resolving domain %s: %s", nameserver, domainName, err)
 			continue

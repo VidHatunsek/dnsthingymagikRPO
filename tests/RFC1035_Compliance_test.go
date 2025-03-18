@@ -143,7 +143,7 @@ func Test_ARecord(t *testing.T) {
 
 // Test AAAA Record (IPv6)
 func Test_AAAARecord(t *testing.T) {
-	response := sendDNSQuery(t, "127.0.0.1:53", "govekar.net.", dnsmessage.TypeAAAA, true)
+	response := sendDNSQuery(t, "127.0.0.1:53", "google.com.", dnsmessage.TypeAAAA, true)
 
 	if response.Header.RCode != dnsmessage.RCodeSuccess {
 		t.Errorf("Expected RCODE 0 (NoError), got %d", response.Header.RCode)

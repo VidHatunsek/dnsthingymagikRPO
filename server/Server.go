@@ -95,8 +95,8 @@ func (s *Server) process(addr net.Addr, buf []byte) {
 	var records []entities.Record
 	if rcode == dnsmessage.RCodeSuccess {
 		for _, q := range msg.Questions {
-			if q.Type == dnsmessage.TypeA {
-				nips, err := resolver.ResolveDN(q.Name, msg.Header.ID, dnsmessage.TypeA, s.cache)
+			if q.Type == dnsmessage.TypeA || q.Type == dnsmessage.TypeAAAA {
+				nips, err := resolver.ResolveDN(q.Name, msg.Header.ID, q.Type, s.cache)
 				if err != nil {
 					log.Printf("Resolution error from %s for %s: %v", addr, q.Name, err)
 
@@ -140,17 +140,34 @@ func (s *Server) buildReplyMessage(id uint16, opcode dnsmessage.OpCode, rd bool,
 		// Build DNS answer section
 
 		for _, record := range records {
-			answers = append(answers, dnsmessage.Resource{
-				Header: dnsmessage.ResourceHeader{
-					Name:  record.Name,
-					Type:  record.RType,
-					Class: record.Class,
-					TTL:   record.TTL,
-				},
-				Body: &dnsmessage.AResource{
-					A: [4]byte{record.IP[0], record.IP[1], record.IP[2], record.IP[3]},
-				},
-			})
+			var a dnsmessage.Resource
+			switch record.RType {
+			case dnsmessage.TypeA:
+				a = dnsmessage.Resource{
+					Header: dnsmessage.ResourceHeader{
+						Name:  record.Name,
+						Type:  record.RType,
+						Class: record.Class,
+						TTL:   record.TTL,
+					},
+					Body: &dnsmessage.AResource{
+						A: [4]byte{record.IP[0], record.IP[1], record.IP[2], record.IP[3]},
+					},
+				}
+			case dnsmessage.TypeAAAA:
+				a = dnsmessage.Resource{
+					Header: dnsmessage.ResourceHeader{
+						Name:  record.Name,
+						Type:  record.RType,
+						Class: record.Class,
+						TTL:   record.TTL,
+					},
+					Body: &dnsmessage.AAAAResource{
+						AAAA: [16]byte(record.IP),
+					},
+				}
+			}
+			answers = append(answers, a)
 		}
 	}
 

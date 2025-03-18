@@ -16,7 +16,7 @@ For now, it successfully recursively resolves A records.
 ### Supported Query Types
 
 - [x] A (IPv4 address)
-- [ ] AAAA (IPv6 address)
+- [x] AAAA (IPv6 address)
 - [x] CNAME (Canonical name)
 - [ ] NS (Nameserver)
 - [ ] MX (Mail Exchange)
