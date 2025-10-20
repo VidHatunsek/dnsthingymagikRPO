@@ -108,3 +108,4 @@ govekar.net.            300     IN      A       185.199.108.153
 
 lovro@LHPw:~$
 ```
+spremenil neka
